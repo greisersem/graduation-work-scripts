@@ -1,0 +1,111 @@
+{
+    "archive": {
+        "classes": {
+            "person": 0,
+            "ear": 1,
+            "ear_protection": 2,
+            "face": 3,
+            "face_guard": 4,
+            "mask": 5,
+            "foot": 6,
+            "tools": 7,
+            "goggles": 8,
+            "gloves": 9,
+            "helmet": 10,
+            "hands": 11,
+            "head": 12,
+            "medical_suit": 13,
+            "boots": 14,
+            "suit": 15,
+            "vest": 16
+        },
+        "structure": "flat",
+        "elements_count": 8099
+    },
+    "construction-ppe": {
+        "classes": {
+            "helmet": 0,
+            "gloves": 1,
+            "vest": 2,
+            "boots": 3,
+            "goggles": 4,
+            "none": 5,
+            "person": 6,
+            "no_helmet": 7,
+            "no_goggles": 8,
+            "no_gloves": 9,
+            "no_boots": 10
+        },
+        "structure": "nested_split",
+        "elements_count": [
+            1416,
+            1426
+        ]
+    },
+    "PPE Dataset for Workplace Safety.v2i.yolov11": {
+        "classes": {
+            "boots": 0,
+            "ear_protection": 1,
+            "goggles": 2,
+            "gloves": 3,
+            "helmet": 4,
+            "mask": 5,
+            "person": 6,
+            "vest": 7
+        },
+        "structure": "split",
+        "elements_count": 1613
+    },
+    "PPE.v3i.yolov11": {
+        "classes": {
+            "earplug": 0,
+            "goggles": 1,
+            "hairnet": 2,
+            "helmet": 3,
+            "mask": 4,
+            "person": 5,
+            "vest": 6
+        },
+        "structure": "split",
+        "elements_count": 6926
+    },
+    "PPEs.v8-allclasses-roboflow-fast-model.yolov11": {
+        "classes": {
+            "gloves": 0,
+            "goggles": 1,
+            "helmet": 2,
+            "mask": 3,
+            "no_suit": 4,
+            "no_gloves": 5,
+            "no_goggles": 6,
+            "no_helmet": 7,
+            "no_mask": 8,
+            "no_boots": 9,
+            "boots": 10,
+            "suit": 11
+        },
+        "structure": "split",
+        "elements_count": 24924
+    },
+    "PPE_Detection.v2i.yolov11": {
+        "classes": {
+            "mask": 0,
+            "goggles": 1,
+            "gloves": 2,
+            "boots": 3,
+            "helmet": 4,
+            "vest": 5,
+            "face_guard": 6
+        },
+        "structure": "split",
+        "elements_count": 3230
+    },
+    "Safety Vests.v9i.yolov11": {
+        "classes": {
+            "no_vest": 0,
+            "vest": 1
+        },
+        "structure": "split",
+        "elements_count": 14803
+    }
+}
