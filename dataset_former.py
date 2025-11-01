@@ -7,15 +7,19 @@ from tqdm import tqdm
 
 BASE_DIR = r"C:\Users\greis\Desktop\Работы уник\Диплом\Датасеты"
 JSON_FILE = "datasets_info.json"
-OUTPUT_DIR = r"C:\Users\greis\Desktop\Работы уник\Диплом\Датасеты\merged_dataset"
+CLASS_NAMES_FILE = "class_names.json"
+OUTPUT_DATASET_NAME = "merged_dataset"
+OUTPUT_DIR = r"C:\Users\greis\Desktop\Работы уник\Диплом\Датасеты" + f"\{OUTPUT_DATASET_NAME}"
 SELECTED_CLASSES = ["helmet", "gloves", "vest"]
 TRAIN_PART = 0.8  # 80%
 VAL_PART = 0.1    # 10%
 TEST_PART = 0.1   # 10%
+RANDOM_SEED = random.seed(12345)
 
 
 def safe_mkdir(path):
     os.makedirs(path, exist_ok=True)
+
 
 def find_dataset_paths(dataset_path, structure):
     paths = []
@@ -35,13 +39,20 @@ def find_dataset_paths(dataset_path, structure):
                 paths.append((img_dir, lbl_dir))
     return paths
 
-def filter_label_file(src_label_path, dst_label_path, class_map, selected_classes):
-    selected_ids = [idx for cls, idx in class_map.items() if cls in selected_classes]
+
+def filter_label_file(src_label_path, dst_label_path, class_map, class_names_map, selected_classes):
+    id_to_normalized = {}
+    for name, idx in class_map.items():
+        normalized = class_names_map.get(name, name)
+        id_to_normalized[idx] = normalized
+
+    new_id_map = {cls: i for i, cls in enumerate(selected_classes)}
+
+    filtered_lines = []
 
     with open(src_label_path, "r", encoding="utf-8") as f:
         lines = f.readlines()
 
-    filtered_lines = []
     for line in lines:
         parts = line.strip().split()
         if not parts:
@@ -50,8 +61,12 @@ def filter_label_file(src_label_path, dst_label_path, class_map, selected_classe
             class_id = int(parts[0])
         except ValueError:
             continue
-        if class_id in selected_ids:
-            filtered_lines.append(line)
+
+        normalized_name = id_to_normalized.get(class_id)
+        if normalized_name in selected_classes:
+            new_id = new_id_map[normalized_name]
+            parts[0] = str(new_id)
+            filtered_lines.append(" ".join(parts) + "\n")
 
     if filtered_lines:
         with open(dst_label_path, "w", encoding="utf-8") as f:
@@ -64,21 +79,29 @@ def main():
     with open(JSON_FILE, "r", encoding="utf-8") as f:
         datasets_info = json.load(f)
 
+    with open(CLASS_NAMES_FILE, "r", encoding="utf-8") as f:
+        class_names_map = json.load(f)
+
     for split in ["train", "val", "test"]:
         safe_mkdir(os.path.join(OUTPUT_DIR, split, "images"))
         safe_mkdir(os.path.join(OUTPUT_DIR, split, "labels"))
 
     matching_datasets = []
     for dataset_name, info in datasets_info.items():
-        classes = list(info["classes"].keys())
-        if all(cls in classes for cls in SELECTED_CLASSES):
+        if dataset_name == OUTPUT_DATASET_NAME:
+            continue
+        normalized_classes = []
+        
+        for cls in info["classes"].keys():
+            normalized_classes.append(class_names_map.get(cls, cls))
+        if all(cls in normalized_classes for cls in SELECTED_CLASSES):
             matching_datasets.append((dataset_name, info))
 
     if not matching_datasets:
         print("[ERROR] Ни один датасет не содержит все выбранные классы.")
         return
 
-    print(f"[INFO] Найдено {len(matching_datasets)} подходящих датасетов:")
+    print(f"[INFO] Найдено {len(matching_datasets)} подходящих датасета:")
     for name, _ in matching_datasets:
         print(f"   - {name}")
 
@@ -89,7 +112,6 @@ def main():
             total_labels += len([f for f in os.listdir(labels_path) if f.endswith(".txt")])
 
     image_counter = 0
-    splits = ["train", "val", "test"]
 
     with tqdm(total=total_labels, desc="Обработка датасетов", unit="файл") as pbar:
         for dataset_name, info in matching_datasets:
@@ -114,7 +136,7 @@ def main():
                 n = len(pairs)
                 train_split = pairs[:int(n * TRAIN_PART)]
                 val_split = pairs[int(n * TRAIN_PART):int(n * (TRAIN_PART + VAL_PART))]
-                test_split = pairs[int(n * VAL_PART):]
+                test_split = pairs[int(n * (VAL_PART + TRAIN_PART)):]
 
                 splits_data = {"train": train_split, "val": val_split, "test": test_split}
 
@@ -124,11 +146,14 @@ def main():
                         image_dst = os.path.join(OUTPUT_DIR, split_name, "images", f"{dataset_name}_{image_counter}{image_ext}")
                         label_dst = os.path.join(OUTPUT_DIR, split_name, "labels", f"{dataset_name}_{image_counter}.txt")
 
-                        ok = filter_label_file(label_src, label_dst, info["classes"], SELECTED_CLASSES)
+                        ok = filter_label_file(label_src, label_dst, info["classes"], class_names_map, SELECTED_CLASSES)
                         if ok:
                             shutil.copy2(image_src, image_dst)
                             image_counter += 1
                         pbar.update(1)
+    print(f"\n[DEBUG] Всего label-файлов: {total_labels}")
+    print(f"[DEBUG] Отфильтровано и скопировано: {image_counter}")
+    print(f"[DEBUG] Процент используемых файлов: {image_counter / total_labels * 100:.2f}%")
 
     print(f"\n[OK] Скопировано {image_counter} изображений с фильтрованными аннотациями.")
 

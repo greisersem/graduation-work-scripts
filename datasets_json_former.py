@@ -8,6 +8,7 @@ sys.stdout.reconfigure(encoding='utf-8')
 
 BASE_DIR = r"C:\Users\greis\Desktop\Работы уник\Диплом\Датасеты"
 OUTPUT_FILE = "datasets_info.json"
+OUTPUT_CLASS_NAMES_FILE = "class_names.json"
 
 
 def find_yaml_file(folder_path):
@@ -84,7 +85,6 @@ def count_elements(folder_path, structure):
         ]) if os.path.exists(lbl_dir) else 0
 
     elif structure == "nested_split":
-        # структура типа images/train, labels/train
         for split in ["train", "val", "test"]:
             img_dir = os.path.join(folder_path, "images", split)
             lbl_dir = os.path.join(folder_path, "labels", split)
@@ -108,7 +108,7 @@ def count_elements(folder_path, structure):
         return images_count
     else:
         print(f"[WARNING] В папке {folder_path} число изображений ({images_count}) "
-              f"не совпадает с числом аннотаций ({labels_count}).")
+              f"не совпадает с числом аннотаций ({labels_count})")
         return images_count, labels_count
 
 
@@ -117,17 +117,21 @@ def process_dataset(folder_path, folder_name):
     yaml_path = find_yaml_file(folder_path)
 
     if not yaml_path:
-        print(f"[WARNING] В папке {folder_name} не найден data.yaml — пропуск.")
+        print(f"[WARNING] В папке {folder_name} не найден data.yaml — пропуск")
         return None
 
     data = load_yaml(yaml_path)
     if (not data) or ("names" not in data):
-        print(f"[WARNING] В {yaml_path} отсутствует ключ 'names' — пропуск.")
+        print(f"[WARNING] В {yaml_path} отсутствует ключ 'names' — пропуск")
         return None
 
     names = data["names"]
-    if not isinstance(names, list) or not all(isinstance(n, str) for n in names):
-        print(f"[ERROR] Поле 'names' в {yaml_path} имеет неверный формат.")
+    if isinstance(names, list):
+        pass
+    elif isinstance(names, dict):
+        names = [v for k, v in sorted(names.items())]
+    else:
+        print(f"[ERROR] Поле 'names' в {yaml_path} имеет неверный формат")
         return None
 
     structure = detect_structure(folder_path)
@@ -142,6 +146,7 @@ def process_dataset(folder_path, folder_name):
 
 def main():
     datasets_info = {}
+    class_names = {}
 
     if not os.path.exists(BASE_DIR):
         print(f"[ERROR] Папка '{BASE_DIR}' не найдена.")
@@ -153,11 +158,20 @@ def main():
             info = process_dataset(folder_path, folder_name)
             if info:
                 datasets_info[folder_name] = info
+                for class_name in info["classes"]:
+                    class_names[class_name] = class_name
 
     try:
         with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
             json.dump(datasets_info, f, ensure_ascii=False, indent=4)
         print(f"[OK] Информация успешно сохранена в {OUTPUT_FILE}")
+    except Exception as e:
+        print(f"[ERROR] Не удалось записать JSON: {e}")
+
+    try:
+        with open(OUTPUT_CLASS_NAMES_FILE, "w", encoding="utf-8") as f:
+            json.dump(class_names, f, ensure_ascii=False, indent=4)
+        print(f"[OK] Информация успешно сохранена в {OUTPUT_CLASS_NAMES_FILE}")
     except Exception as e:
         print(f"[ERROR] Не удалось записать JSON: {e}")
 
