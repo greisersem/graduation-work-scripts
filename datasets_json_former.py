@@ -2,6 +2,7 @@ import os
 import yaml
 import json
 import sys
+import argparse
 
 
 sys.stdout.reconfigure(encoding='utf-8')
@@ -144,16 +145,48 @@ def process_dataset(folder_path, folder_name):
     }
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Обработка датасетов и создание JSON файлов с информацией о классах и структуре"
+    )
+    parser.add_argument(
+        "--datasets-path",
+        type=str,
+        default=None,
+        help="Путь к папке с датасетами (если не указан, используется значение BASE_DIR)"
+    )
+    parser.add_argument(
+        "--output-path",
+        type=str,
+        default=None,
+        help="Путь для сохранения выходных JSON файлов (если не указан, используется директория с датасетами)"
+    )
+    return parser.parse_args()
+
+
 def main():
+    args = parse_args()
+    
+    datasets_dir = args.datasets_path if args.datasets_path else BASE_DIR
+    
+    if args.output_path:
+        output_dir = args.output_path
+        os.makedirs(output_dir, exist_ok=True)
+        output_file = os.path.join(output_dir, OUTPUT_FILE)
+        output_class_names_file = os.path.join(output_dir, OUTPUT_CLASS_NAMES_FILE)
+    else:
+        output_file = os.path.join(datasets_dir, OUTPUT_FILE)
+        output_class_names_file = os.path.join(datasets_dir, OUTPUT_CLASS_NAMES_FILE)
+
     datasets_info = {}
     class_names = {}
 
-    if not os.path.exists(BASE_DIR):
-        print(f"[ERROR] Папка '{BASE_DIR}' не найдена.")
+    if not os.path.exists(datasets_dir):
+        print(f"[ERROR] Папка '{datasets_dir}' не найдена.")
         return
 
-    for folder_name in os.listdir(BASE_DIR):
-        folder_path = os.path.join(BASE_DIR, folder_name)
+    for folder_name in os.listdir(datasets_dir):
+        folder_path = os.path.join(datasets_dir, folder_name)
         if os.path.isdir(folder_path):
             info = process_dataset(folder_path, folder_name)
             if info:
@@ -162,16 +195,16 @@ def main():
                     class_names[class_name] = class_name
 
     try:
-        with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
+        with open(output_file, "w", encoding="utf-8") as f:
             json.dump(datasets_info, f, ensure_ascii=False, indent=4)
-        print(f"[OK] Информация успешно сохранена в {OUTPUT_FILE}")
+        print(f"[OK] Информация успешно сохранена в {output_file}")
     except Exception as e:
         print(f"[ERROR] Не удалось записать JSON: {e}")
 
     try:
-        with open(OUTPUT_CLASS_NAMES_FILE, "w", encoding="utf-8") as f:
+        with open(output_class_names_file, "w", encoding="utf-8") as f:
             json.dump(class_names, f, ensure_ascii=False, indent=4)
-        print(f"[OK] Информация успешно сохранена в {OUTPUT_CLASS_NAMES_FILE}")
+        print(f"[OK] Информация успешно сохранена в {output_class_names_file}")
     except Exception as e:
         print(f"[ERROR] Не удалось записать JSON: {e}")
 

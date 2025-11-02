@@ -2,6 +2,7 @@ import os
 import json
 import shutil
 import random
+import argparse
 from tqdm import tqdm
 
 
@@ -40,6 +41,37 @@ def find_dataset_paths(dataset_path, structure):
     return paths
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Объединение и фильтрация датасетов по выбранным классам"
+    )
+    parser.add_argument(
+        "--source-path",
+        type=str,
+        default=None,
+        help="Путь к исходным датасетам (если не указан, используется значение BASE_DIR)"
+    )
+    parser.add_argument(
+        "--target-path",
+        type=str,
+        default=None,
+        help="Путь к новому создаваемому датасету (если не указан, используется значение OUTPUT_DIR)"
+    )
+    parser.add_argument(
+        "--classes",
+        type=str,
+        default=None,
+        help="Имена классов, разделенные запятыми (если не указаны, используется значение SELECTED_CLASSES)"
+    )
+    parser.add_argument(
+        "--datasets-info-path",
+        type=str,
+        default=None,
+        help="Путь к JSON файлам с информацией о датасетах (если не указан, используется source-path)"
+    )
+    return parser.parse_args()
+
+
 def filter_label_file(src_label_path, dst_label_path, class_map, class_names_map, selected_classes):
     id_to_normalized = {}
     for name, idx in class_map.items():
@@ -76,25 +108,47 @@ def filter_label_file(src_label_path, dst_label_path, class_map, class_names_map
 
 
 def main():
-    with open(JSON_FILE, "r", encoding="utf-8") as f:
+    args = parse_args()
+    
+    # Определяем пути
+    source_dir = args.source_path if args.source_path else BASE_DIR
+    target_dir = args.target_path if args.target_path else OUTPUT_DIR
+    
+    # Определяем выбранные классы
+    if args.classes:
+        selected_classes = [cls.strip() for cls in args.classes.split(",")]
+    else:
+        selected_classes = SELECTED_CLASSES
+    
+    # Определяем путь к JSON файлам
+    if args.datasets_info_path:
+        info_dir = args.datasets_info_path
+    else:
+        info_dir = source_dir
+    
+    json_file = os.path.join(info_dir, JSON_FILE)
+    class_names_file = os.path.join(info_dir, CLASS_NAMES_FILE)
+    
+    with open(json_file, "r", encoding="utf-8") as f:
         datasets_info = json.load(f)
 
-    with open(CLASS_NAMES_FILE, "r", encoding="utf-8") as f:
+    with open(class_names_file, "r", encoding="utf-8") as f:
         class_names_map = json.load(f)
 
     for split in ["train", "val", "test"]:
-        safe_mkdir(os.path.join(OUTPUT_DIR, split, "images"))
-        safe_mkdir(os.path.join(OUTPUT_DIR, split, "labels"))
+        safe_mkdir(os.path.join(target_dir, split, "images"))
+        safe_mkdir(os.path.join(target_dir, split, "labels"))
 
     matching_datasets = []
+    output_dataset_name = os.path.basename(target_dir)
     for dataset_name, info in datasets_info.items():
-        if dataset_name == OUTPUT_DATASET_NAME:
+        if dataset_name == output_dataset_name:
             continue
         normalized_classes = []
         
         for cls in info["classes"].keys():
             normalized_classes.append(class_names_map.get(cls, cls))
-        if all(cls in normalized_classes for cls in SELECTED_CLASSES):
+        if all(cls in normalized_classes for cls in selected_classes):
             matching_datasets.append((dataset_name, info))
 
     if not matching_datasets:
@@ -107,7 +161,7 @@ def main():
 
     total_labels = 0
     for dataset_name, info in matching_datasets:
-        dataset_path = os.path.join(BASE_DIR, dataset_name)
+        dataset_path = os.path.join(source_dir, dataset_name)
         for _, labels_path in find_dataset_paths(dataset_path, info["structure"]):
             total_labels += len([f for f in os.listdir(labels_path) if f.endswith(".txt")])
 
@@ -115,7 +169,7 @@ def main():
 
     with tqdm(total=total_labels, desc="Обработка датасетов", unit="файл") as pbar:
         for dataset_name, info in matching_datasets:
-            dataset_path = os.path.join(BASE_DIR, dataset_name)
+            dataset_path = os.path.join(source_dir, dataset_name)
             for images_path, labels_path in find_dataset_paths(dataset_path, info["structure"]):
 
                 pairs = []
@@ -143,10 +197,10 @@ def main():
                 for split_name, split_pairs in splits_data.items():
                     for image_src, label_src in split_pairs:
                         image_ext = os.path.splitext(image_src)[1]
-                        image_dst = os.path.join(OUTPUT_DIR, split_name, "images", f"{dataset_name}_{image_counter}{image_ext}")
-                        label_dst = os.path.join(OUTPUT_DIR, split_name, "labels", f"{dataset_name}_{image_counter}.txt")
+                        image_dst = os.path.join(target_dir, split_name, "images", f"{dataset_name}_{image_counter}{image_ext}")
+                        label_dst = os.path.join(target_dir, split_name, "labels", f"{dataset_name}_{image_counter}.txt")
 
-                        ok = filter_label_file(label_src, label_dst, info["classes"], class_names_map, SELECTED_CLASSES)
+                        ok = filter_label_file(label_src, label_dst, info["classes"], class_names_map, selected_classes)
                         if ok:
                             shutil.copy2(image_src, image_dst)
                             image_counter += 1
@@ -157,13 +211,13 @@ def main():
 
     print(f"\n[OK] Скопировано {image_counter} изображений с фильтрованными аннотациями.")
 
-    yaml_path = os.path.join(OUTPUT_DIR, "data.yaml")
+    yaml_path = os.path.join(target_dir, "data.yaml")
     with open(yaml_path, "w", encoding="utf-8") as f:
         f.write("train: ./train/images\n")
         f.write("val: ./val/images\n")
         f.write("test: ./test/images\n\n")
-        f.write(f"nc: {len(SELECTED_CLASSES)}\n")
-        f.write(f"names: {SELECTED_CLASSES}\n")
+        f.write(f"nc: {len(selected_classes)}\n")
+        f.write(f"names: {selected_classes}\n")
 
     print(f"[OK] Итоговый YAML создан: {yaml_path}")
 
