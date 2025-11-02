@@ -20,8 +20,61 @@ def find_yaml_file(folder_path):
     return None
 
 
+def find_obj_names_file(folder_path):
+    for root, _, files in os.walk(folder_path):
+        for f in files:
+            if f.lower() == "obj.names":
+                return os.path.join(root, f)
+    return None
+
+
+def find_obj_data_file(folder_path):
+    for root, _, files in os.walk(folder_path):
+        for f in files:
+            if f.lower() == "obj.data":
+                return os.path.join(root, f)
+    return None
+
+
+def load_obj_names(file_path):
+    """Чтение obj.names файла (по одному классу на строку)"""
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            names = [line.strip() for line in f.readlines() if line.strip()]
+        return names
+    except Exception as e:
+        print(f"[ERROR] Не удалось прочитать {file_path}: {e}")
+        return None
+
+
+def load_obj_data(file_path):
+    """Парсинг obj.data файла для получения количества классов"""
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        # Ищем строку classes = X
+        for line in content.split('\n'):
+            line = line.strip()
+            if line.startswith('classes'):
+                parts = line.split('=')
+                if len(parts) == 2:
+                    return int(parts[1].strip())
+        return None
+    except Exception as e:
+        print(f"[ERROR] Не удалось прочитать {file_path}: {e}")
+        return None
+
+
 def detect_structure(folder_path):
     subfolders = [d.lower() for d in os.listdir(folder_path) if os.path.isdir(os.path.join(folder_path, d))]
+
+    # Проверка на формат Darknet YOLO
+    obj_train_data_path = os.path.join(folder_path, "obj_train_data")
+    obj_names_path = find_obj_names_file(folder_path)
+    obj_data_path = find_obj_data_file(folder_path)
+    
+    if os.path.exists(obj_train_data_path) and (obj_names_path or obj_data_path):
+        return "darknet"
 
     if any(x in subfolders for x in ["train", "val", "test"]):
         return "split"
@@ -102,6 +155,21 @@ def count_elements(folder_path, structure):
                     if f.lower().endswith(".txt")
                 ])
 
+    elif structure == "darknet":
+        obj_train_data_path = os.path.join(folder_path, "obj_train_data")
+        if os.path.exists(obj_train_data_path):
+            files = os.listdir(obj_train_data_path)
+            images_count = len([
+                f for f in files
+                if any(f.lower().endswith(ext) for ext in IMAGE_EXTS)
+            ])
+            labels_count = len([
+                f for f in files
+                if f.lower().endswith(".txt")
+            ])
+        else:
+            return None
+
     else:
         return None
 
@@ -116,26 +184,40 @@ def count_elements(folder_path, structure):
 
 def process_dataset(folder_path, folder_name):
     yaml_path = find_yaml_file(folder_path)
-
-    if not yaml_path:
-        print(f"[WARNING] В папке {folder_name} не найден data.yaml — пропуск")
-        return None
-
-    data = load_yaml(yaml_path)
-    if (not data) or ("names" not in data):
-        print(f"[WARNING] В {yaml_path} отсутствует ключ 'names' — пропуск")
-        return None
-
-    names = data["names"]
-    if isinstance(names, list):
-        pass
-    elif isinstance(names, dict):
-        names = [v for k, v in sorted(names.items())]
-    else:
-        print(f"[ERROR] Поле 'names' в {yaml_path} имеет неверный формат")
-        return None
-
+    
+    names = None
     structure = detect_structure(folder_path)
+
+    # Попытка загрузить из YAML (формат YOLOv8)
+    if yaml_path:
+        data = load_yaml(yaml_path)
+        if data and "names" in data:
+            names = data["names"]
+            if isinstance(names, list):
+                pass
+            elif isinstance(names, dict):
+                names = [v for k, v in sorted(names.items())]
+            else:
+                print(f"[ERROR] Поле 'names' в {yaml_path} имеет неверный формат")
+                return None
+
+    # Если не нашли YAML, пробуем формат Darknet
+    if not names and structure == "darknet":
+        obj_names_path = find_obj_names_file(folder_path)
+        if obj_names_path:
+            names = load_obj_names(obj_names_path)
+            if not names:
+                print(f"[WARNING] Не удалось загрузить классы из {obj_names_path} — пропуск")
+                return None
+        else:
+            print(f"[WARNING] В папке {folder_name} не найден obj.names — пропуск")
+            return None
+
+    # Если ничего не нашли
+    if not names:
+        print(f"[WARNING] В папке {folder_name} не найден data.yaml или obj.names — пропуск")
+        return None
+
     elements_count = count_elements(folder_path, structure)
 
     return {
