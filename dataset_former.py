@@ -10,7 +10,7 @@ BASE_DIR = r"C:\Users\greis\Desktop\Работы уник\Диплом\Дата�
 JSON_FILE = "datasets_info.json"
 CLASS_NAMES_FILE = "class_names.json"
 OUTPUT_DATASET_NAME = "merged_dataset"
-OUTPUT_DIR = r"C:\Users\greis\Desktop\Работы уник\Диплом\Датасеты" + f"\{OUTPUT_DATASET_NAME}"
+OUTPUT_DIR = os.path.join(r"C:\Users\greis\Desktop\Работы уник\Диплом\Датасеты", OUTPUT_DATASET_NAME)
 SELECTED_CLASSES = ["helmet", "gloves", "vest"]
 TRAIN_PART = 0.8  # 80%
 VAL_PART = 0.1    # 10%
@@ -38,6 +38,11 @@ def find_dataset_paths(dataset_path, structure):
             lbl_dir = os.path.join(dataset_path, "labels", subset)
             if os.path.exists(img_dir) and os.path.exists(lbl_dir):
                 paths.append((img_dir, lbl_dir))
+    elif structure == "darknet":
+        obj_train_data_path = os.path.join(dataset_path, "obj_train_data")
+        if os.path.exists(obj_train_data_path):
+            # Для Darknet формата изображения и аннотации в одной папке
+            paths.append((obj_train_data_path, obj_train_data_path))
     return paths
 
 
@@ -135,7 +140,7 @@ def main():
     with open(class_names_file, "r", encoding="utf-8") as f:
         class_names_map = json.load(f)
 
-    for split in ["train", "val", "test"]:
+    for split in ["train", "valid", "test"]:
         safe_mkdir(os.path.join(target_dir, split, "images"))
         safe_mkdir(os.path.join(target_dir, split, "labels"))
 
@@ -192,7 +197,7 @@ def main():
                 val_split = pairs[int(n * TRAIN_PART):int(n * (TRAIN_PART + VAL_PART))]
                 test_split = pairs[int(n * (VAL_PART + TRAIN_PART)):]
 
-                splits_data = {"train": train_split, "val": val_split, "test": test_split}
+                splits_data = {"train": train_split, "valid": val_split, "test": test_split}
 
                 for split_name, split_pairs in splits_data.items():
                     for image_src, label_src in split_pairs:
@@ -214,7 +219,7 @@ def main():
     yaml_path = os.path.join(target_dir, "data.yaml")
     with open(yaml_path, "w", encoding="utf-8") as f:
         f.write("train: ./train/images\n")
-        f.write("val: ./val/images\n")
+        f.write("val: ./valid/images\n")
         f.write("test: ./test/images\n\n")
         f.write(f"nc: {len(selected_classes)}\n")
         f.write(f"names: {selected_classes}\n")
