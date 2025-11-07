@@ -103,15 +103,15 @@ def train_yolo(dataset_path, model_version, epochs, batch, img_size, target_dir)
     else:
         model = YOLO(model_version)
 
-    # model.train(
-    #     data=data_yaml,
-    #     epochs=epochs,
-    #     batch=batch,
-    #     imgsz=img_size,
-    #     project=model_dir,
-    #     name="train",
-    #     exist_ok=False
-    # )
+    model.train(
+        data=data_yaml,
+        epochs=epochs,
+        batch=batch,
+        imgsz=img_size,
+        project=model_dir,
+        name="train",
+        exist_ok=False
+    )
 
     trained_model_path = os.path.join(model_dir, "train", "weights", "best.pt")
     trained_model = YOLO(trained_model_path)
