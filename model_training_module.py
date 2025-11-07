@@ -1,6 +1,7 @@
 import os
 import argparse
 from ultralytics import YOLO
+import csv
 
 
 DATASET_PATH = "/media/user/Data/IndustrialSafety/Datasets/SH17"
@@ -102,7 +103,7 @@ def train_yolo(dataset_path, model_version, epochs, batch, img_size, target_dir)
     else:
         model = YOLO(model_version)
 
-    results = model.train(
+    model.train(
         data=data_yaml,
         epochs=epochs,
         batch=batch,
@@ -112,7 +113,7 @@ def train_yolo(dataset_path, model_version, epochs, batch, img_size, target_dir)
         exist_ok=False
     )
 
-    model.val(
+    result = model.val(
         data=data_yaml, 
         split='test', 
         project=model_dir, 
@@ -122,6 +123,8 @@ def train_yolo(dataset_path, model_version, epochs, batch, img_size, target_dir)
 
     best_model_path = os.path.join(model_dir, "train", "weights", "best.pt")
 
+    save_metrics_csv(result, model_dir)
+
     print("\n" + "-" * 60)
     if os.path.exists(best_model_path):
         print(f"[OK] Обучение завершено.")
@@ -129,6 +132,31 @@ def train_yolo(dataset_path, model_version, epochs, batch, img_size, target_dir)
     else:
         print("[WARNING] best.pt не найден. Проверьте лог Ultralytics.")
     print("-" * 60 + "\n")
+
+
+def save_metrics_csv(test_result, model_dir):
+    csv_file = os.path.join(model_dir, "test_metrics.csv") 
+    
+    with open(csv_file, mode='w', newline='') as f:
+        writer = csv.writer(f)
+
+    writer.writerow([
+        "class", "images", "instances", 
+        "precision", "recall", "mAP50", "mAP50-95"
+    ])
+
+    for cls, metrics in zip(test_result.names.values(), test_result.metrics):
+        writer.writerow([
+            cls,
+            metrics.get('images', ''),
+            metrics.get('instances', ''),
+            metrics.get('precision', ''),
+            metrics.get('recall', ''),
+            metrics.get('mAP50', ''),
+            metrics.get('mAP50-95', '')
+        ])
+    
+    print(f"[INFO] Метрики сохранены в {csv_file}")
 
 
 def main():
