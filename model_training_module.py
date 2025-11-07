@@ -3,97 +3,151 @@ import argparse
 from ultralytics import YOLO
 
 
-def train_yolo(dataset_path, model_version="yolov8n.pt", epochs=50, batch=16, img_size=640):
-    data_yaml = os.path.join(dataset_path, "data.yaml")
-    if not os.path.exists(data_yaml):
-        raise FileNotFoundError(f"Не найден файл конфигурации: {data_yaml}")
-
-    dataset_name = os.path.basename(os.path.normpath(dataset_path))
-
-    models_dir = os.path.join("models", dataset_name)
-    os.makedirs(models_dir, exist_ok=True)
-
-    print("\n" + "=" * 60)
-    print(f"[INFO] Начинается обучение модели: {model_version}")
-    print(f"[INFO] Датасет: {dataset_name}")
-    print(f"[INFO] Конфигурация: {data_yaml}")
-    print(f"[INFO] Сохранение результатов: {models_dir}")
-    print("=" * 60 + "\n")
-
-    model = YOLO(model_version)
-
-    results = model.train(
-        data=data_yaml,
-        epochs=epochs,
-        batch=batch,
-        imgsz=img_size,
-        project=models_dir,
-        name="train",
-        exist_ok=True
-    )
-
-    best_model_path = os.path.join(models_dir, "train", "weights", "best.pt")
-
-    print("\n" + "-" * 60)
-    if os.path.exists(best_model_path):
-        print(f"[OK] Обучение завершено.")
-        print(f"[INFO] Лучший вес сохранён по пути:\n{best_model_path}")
-    else:
-        print("[WARNING] best.pt не найден. Проверьте лог Ultralytics.")
-    print("-" * 60 + "\n")
-
-    return best_model_path
+DATASET_PATH = "/media/user/Data/IndustrialSafety/Datasets/SH17"
+MODELS_BASE_DIR = "/media/user/Data/IndustrialSafety/Models"
+MODEL_VERSION = "yolov8n"
+EPOCHS = 50
+BATCH = 16
+IMG_SIZE = 640
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Удобный запуск обучения YOLO моделей")
+    parser = argparse.ArgumentParser(description="Обучение моделей")
 
     parser.add_argument(
         "--data",
         type=str,
-        required=True,
+        default=None,
         help="Путь к папке с датасетом (должен содержать файл data.yaml)"
     )
 
     parser.add_argument(
         "--model",
         type=str,
-        default="yolov8n.pt",
-        help="YOLO модель (например: yolov8n.pt, yolov8s.pt, yolov11n.pt)"
+        default=None,
+        help="Модель (например: yolov8n.pt, yolov8s.pt, yolov11n.pt)"
     )
 
     parser.add_argument(
         "--epochs",
         type=int,
-        default=50,
+        default=None,
         help="Количество эпох обучения"
     )
 
     parser.add_argument(
         "--batch",
         type=int,
-        default=16,
+        default=None,
         help="Размер batch"
     )
 
     parser.add_argument(
-        "--img",
+        "--img-size",
         type=int,
-        default=640,
-        help="Размер изображения (imgsz)"
+        default=None,
+        help="Размер изображения"
+    )
+
+    parser.add_argument(
+        "--target-path",
+        type=str,
+        default=None,
+        help="Путь к папке с результатами обучения"
     )
 
     return parser.parse_args()
 
 
+def train_yolo(dataset_path, model_version, epochs, batch, img_size, target_dir):
+    if not os.path.exists(dataset_path):
+        raise FileNotFoundError(f"Папка с датасетом не найдена: {dataset_path}")
+    
+    data_yaml = os.path.join(dataset_path, "data.yaml")
+
+    if not os.path.exists(data_yaml):
+        raise FileNotFoundError(f"Не найден yaml файл: {data_yaml}")
+
+    dataset_name = os.path.basename(os.path.normpath(dataset_path))
+
+    
+    model_dir = os.path.join(
+        target_dir, 
+        dataset_name, 
+        f"{model_version.replace('.pt', '')}_{epochs}epochs"
+        )
+    
+    if os.path.exists(model_dir):
+        while True:
+            answer = input(f"[WARNING] Папка с таким названием уже существует: {model_dir}\nПродолжить обучение? (y/n): ").strip().lower()
+            if answer == 'y':
+                break
+            elif answer == 'n':
+                exit(0)
+            else:
+                print("Пожалуйста, введите только 'y' или 'n'.")
+    else:
+        os.makedirs(model_dir, exist_ok=True)
+
+    print("\n" + "=" * 60)
+    print(f"[INFO] Обучение модели: {model_version}")
+    print(f"[INFO] Датасет: {dataset_name}")
+    print(f"[INFO] Конфигурация: {data_yaml}")
+    print(f"[INFO] Сохранение результатов в {model_dir}")
+    print("=" * 60 + "\n")
+
+    _, model_ext = os.path.splitext(model_version)
+    if model_ext == '':
+        model = YOLO(model_version + ".pt")
+    else:
+        model = YOLO(model_version)
+
+    results = model.train(
+        data=data_yaml,
+        epochs=epochs,
+        batch=batch,
+        imgsz=img_size,
+        project=model_dir,
+        name="train",
+        exist_ok=False
+    )
+
+    model.val(
+        data=data_yaml, 
+        split='test', 
+        project=model_dir, 
+        name="test",
+        exist_ok = False
+        )
+
+    best_model_path = os.path.join(model_dir, "train", "weights", "best.pt")
+
+    print("\n" + "-" * 60)
+    if os.path.exists(best_model_path):
+        print(f"[OK] Обучение завершено.")
+        print(f"[INFO] Модель сохранена по пути:\n{best_model_path}")
+    else:
+        print("[WARNING] best.pt не найден. Проверьте лог Ultralytics.")
+    print("-" * 60 + "\n")
+
+
 def main():
     args = parse_args()
+    
+    data = args.data if args.data else DATASET_PATH
+    model_version = args.model if args.model else MODEL_VERSION
+    epochs = args.epochs if args.epochs else EPOCHS
+    batch = args.batch if args.batch else BATCH
+    img_size = args.img_size if args.img_size else IMG_SIZE
+    target_dir = args.target_path if args.target_path else MODELS_BASE_DIR
+
     train_yolo(
-        dataset_path=args.data,
-        model_version=args.model,
-        epochs=args.epochs,
-        batch=args.batch,
-        img_size=args.img
+        dataset_path=data,
+        model_version=model_version,
+        epochs=epochs,
+        batch=batch,
+        img_size=img_size,
+        target_dir=target_dir
     )
 
 
