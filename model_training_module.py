@@ -4,7 +4,7 @@ from ultralytics import YOLO
 import csv
 
 
-DATASET_PATH = "/media/user/Data/IndustrialSafety/Datasets/SH17"
+DATASET_PATH = "/media/user/Data/IndustrialSafety/Datasets/HardHatSkz"
 MODELS_BASE_DIR = "/media/user/Data/IndustrialSafety/Models"
 MODEL_VERSION = "yolov8n"
 EPOCHS = 50
@@ -103,17 +103,20 @@ def train_yolo(dataset_path, model_version, epochs, batch, img_size, target_dir)
     else:
         model = YOLO(model_version)
 
-    model.train(
-        data=data_yaml,
-        epochs=epochs,
-        batch=batch,
-        imgsz=img_size,
-        project=model_dir,
-        name="train",
-        exist_ok=False
-    )
+    # model.train(
+    #     data=data_yaml,
+    #     epochs=epochs,
+    #     batch=batch,
+    #     imgsz=img_size,
+    #     project=model_dir,
+    #     name="train",
+    #     exist_ok=False
+    # )
 
-    result = model.val(
+    trained_model_path = os.path.join(model_dir, "train", "weights", "best.pt")
+    trained_model = YOLO(trained_model_path)
+
+    result = trained_model.val(
         data=data_yaml, 
         split='test', 
         project=model_dir, 
@@ -121,14 +124,12 @@ def train_yolo(dataset_path, model_version, epochs, batch, img_size, target_dir)
         exist_ok = False
         )
 
-    best_model_path = os.path.join(model_dir, "train", "weights", "best.pt")
-
     save_metrics_csv(result, model_dir)
 
     print("\n" + "-" * 60)
-    if os.path.exists(best_model_path):
+    if os.path.exists(trained_model_path):
         print(f"[OK] Обучение завершено.")
-        print(f"[INFO] Модель сохранена по пути:\n{best_model_path}")
+        print(f"[INFO] Модель сохранена по пути:\n{trained_model_path}")
     else:
         print("[WARNING] best.pt не найден. Проверьте лог Ultralytics.")
     print("-" * 60 + "\n")
@@ -137,27 +138,11 @@ def train_yolo(dataset_path, model_version, epochs, batch, img_size, target_dir)
 def save_metrics_csv(test_result, model_dir):
     csv_file = os.path.join(model_dir, "test_metrics.csv") 
     
-    with open(csv_file, mode='w', newline='') as f:
-        writer = csv.writer(f)
+    csv_data = test_result.to_csv()
 
-    writer.writerow([
-        "class", "images", "instances", 
-        "precision", "recall", "mAP50", "mAP50-95"
-    ])
-
-    for cls, metrics in zip(test_result.names.values(), test_result.metrics):
-        writer.writerow([
-            cls,
-            metrics.get('images', ''),
-            metrics.get('instances', ''),
-            metrics.get('precision', ''),
-            metrics.get('recall', ''),
-            metrics.get('mAP50', ''),
-            metrics.get('mAP50-95', '')
-        ])
+    with open(csv_file, "w", encoding="utf-8") as f:
+        f.write(csv_data)
     
-    print(f"[INFO] Метрики сохранены в {csv_file}")
-
 
 def main():
     args = parse_args()
