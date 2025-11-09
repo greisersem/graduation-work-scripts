@@ -50,30 +50,35 @@ def parse_args():
     parser = argparse.ArgumentParser(
         description="Объединение и фильтрация датасетов по выбранным классам"
     )
+
     parser.add_argument(
         "--source-path",
         type=str,
         default=None,
         help="Путь к исходным датасетам (если не указан, используется значение BASE_DIR)"
     )
+
     parser.add_argument(
         "--target-path",
         type=str,
         default=None,
         help="Путь к новому создаваемому датасету (если не указан, используется значение OUTPUT_DIR)"
     )
+
     parser.add_argument(
         "--classes",
         type=str,
         default=None,
         help="Имена классов, разделенные запятыми (если не указаны, используется значение SELECTED_CLASSES)"
     )
+
     parser.add_argument(
         "--datasets-info-path",
         type=str,
         default=None,
         help="Путь к JSON файлам с информацией о датасетах (если не указан, используется source-path)"
     )
+    
     return parser.parse_args()
 
 

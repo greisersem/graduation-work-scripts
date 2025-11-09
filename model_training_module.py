@@ -103,36 +103,55 @@ def train_yolo(dataset_path, model_version, epochs, batch, img_size, target_dir)
     else:
         model = YOLO(model_version)
 
-    model.train(
-        data=data_yaml,
-        epochs=epochs,
-        batch=batch,
-        imgsz=img_size,
-        project=model_dir,
-        name="train",
-        exist_ok=False
-    )
-
-    trained_model_path = os.path.join(model_dir, "train", "weights", "best.pt")
-    trained_model = YOLO(trained_model_path)
-
-    result = trained_model.val(
-        data=data_yaml, 
-        split='test', 
-        project=model_dir, 
-        name="test",
-        exist_ok = False
+    try:
+        model.train(
+            data=data_yaml,
+            epochs=epochs,
+            batch=batch,
+            imgsz=img_size,
+            project=model_dir,
+            name="train",
+            exist_ok=False
         )
 
-    save_metrics_csv(result, model_dir)
+        model_path = os.path.join(model_dir, "train", "weights", "best.pt")
 
-    print("\n" + "-" * 60)
-    if os.path.exists(trained_model_path):
-        print(f"[OK] Обучение завершено.")
-        print(f"[INFO] Модель сохранена по пути:\n{trained_model_path}")
-    else:
-        print("[WARNING] best.pt не найден. Проверьте лог Ultralytics.")
-    print("-" * 60 + "\n")
+        print("\n" + "-" * 60)
+        if os.path.exists(model_path):
+            print(f"[OK] Обучение завершено.")
+            print(f"[INFO] Модель сохранена по пути:\n{model_path}")
+    except Exception as e:
+        print(f"[ERROR] Не удалось запустить обучение {model_version} на датасете {dataset_name} на {epochs} эпох: {e}")
+    
+    return model_dir
+
+
+def test_yolo(model_dir, dataset_path):
+    model_path = os.path.join(model_dir, "train", "weights", "best.pt")
+    trained_model = YOLO(model_path)
+
+    data_yaml = os.path.join(dataset_path, "data.yaml")
+
+    try:
+        result = trained_model.val(
+            data=data_yaml, 
+            split='test', 
+            project=model_dir, 
+            name="test",
+            exist_ok = False
+            )
+
+        save_metrics_csv(result, model_dir)
+
+        print("\n" + "-" * 60)
+        if os.path.exists(os.path.join(model_dir, "test_metrics.csv") ):
+            print(f"[OK] Тестирование завершено.")
+            print(f"[INFO] Результаты сохранены по пути:\n{model_dir}")
+        else:
+            print("[ERROR] .csv файл не найден. Проверьте лог Ultralytics.")
+        print("-" * 60 + "\n")
+    except Exception as e:
+        print(f"[ERROR] Не удалось протестировать {model_dir} на датасете {dataset_path}: {e}")
 
 
 def save_metrics_csv(test_result, model_dir):
@@ -154,7 +173,7 @@ def main():
     img_size = args.img_size if args.img_size else IMG_SIZE
     target_dir = args.target_path if args.target_path else MODELS_BASE_DIR
 
-    train_yolo(
+    model_dir = train_yolo(
         dataset_path=data,
         model_version=model_version,
         epochs=epochs,
@@ -162,6 +181,8 @@ def main():
         img_size=img_size,
         target_dir=target_dir
     )
+
+    test_yolo(model_dir, data)
 
 
 if __name__ == "__main__":
