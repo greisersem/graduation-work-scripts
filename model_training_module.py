@@ -57,6 +57,12 @@ def parse_args():
         help="Путь к папке с результатами обучения"
     )
 
+    parser.add_argument(
+        "--test-only",
+        action="store-true",
+        help="Выполнить только тестирование без обучения"
+    )
+
     return parser.parse_args()
 
 
@@ -133,6 +139,13 @@ def test_yolo(model_dir, dataset_path):
     data_yaml = os.path.join(dataset_path, "data.yaml")
 
     try:
+        print("\n" + "=" * 60)
+        print(f"[INFO] Тестирование модели: {model_dir}")
+        print(f"[INFO] Датасет: {dataset_path}")
+        print(f"[INFO] Конфигурация: {data_yaml}")
+        print(f"[INFO] Сохранение результатов в {model_dir}")
+        print("=" * 60 + "\n")
+
         result = trained_model.val(
             data=data_yaml, 
             split='test', 
@@ -141,12 +154,12 @@ def test_yolo(model_dir, dataset_path):
             exist_ok = False
             )
 
-        save_metrics_csv(result, model_dir)
+        csv_file = save_metrics_csv(result, model_dir)
 
         print("\n" + "-" * 60)
-        if os.path.exists(os.path.join(model_dir, "test_metrics.csv") ):
+        if os.path.exists(csv_file):
             print(f"[OK] Тестирование завершено.")
-            print(f"[INFO] Результаты сохранены по пути:\n{model_dir}")
+            print(f"[INFO] Результаты сохранены по пути:\n{csv_file}")
         else:
             print("[ERROR] .csv файл не найден. Проверьте лог Ultralytics.")
         print("-" * 60 + "\n")
@@ -162,6 +175,8 @@ def save_metrics_csv(test_result, model_dir):
     with open(csv_file, "w", encoding="utf-8") as f:
         f.write(csv_data)
     
+    return csv_file
+    
 
 def main():
     args = parse_args()
@@ -173,16 +188,19 @@ def main():
     img_size = args.img_size if args.img_size else IMG_SIZE
     target_dir = args.target_path if args.target_path else MODELS_BASE_DIR
 
-    model_dir = train_yolo(
-        dataset_path=data,
-        model_version=model_version,
-        epochs=epochs,
-        batch=batch,
-        img_size=img_size,
-        target_dir=target_dir
-    )
+    if not args.test_only:
+        model_dir = train_yolo(
+            dataset_path=data,
+            model_version=model_version,
+            epochs=epochs,
+            batch=batch,
+            img_size=img_size,
+            target_dir=target_dir
+        )
 
     test_yolo(model_dir, data)
+    
+
 
 
 if __name__ == "__main__":
