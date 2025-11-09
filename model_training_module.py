@@ -58,6 +58,13 @@ def parse_args():
     )
 
     parser.add_argument(
+        "--model-dir",
+        type=str,
+        default=None,
+        help="Путь к папке с моделью"
+    )
+
+    parser.add_argument(
         "--test-only",
         action="store-true",
         help="Выполнить только тестирование без обучения"
@@ -198,10 +205,14 @@ def main():
             target_dir=target_dir
         )
 
-    test_yolo(model_dir, data)
+        test_yolo(model_dir, data)
+    else:
+        model_dir = args.model_dir
+        if model_dir:
+            test_yolo(model_dir, data)
+        else:
+            print(f"[ERROR] Не указан путь к модели")
+
     
-
-
-
 if __name__ == "__main__":
     main()
