@@ -231,18 +231,21 @@ def parse_args():
     parser = argparse.ArgumentParser(
         description="Обработка датасетов и создание JSON файлов с информацией о классах и структуре"
     )
+
     parser.add_argument(
         "--datasets-path",
         type=str,
         default=None,
         help="Путь к папке с датасетами (если не указан, используется значение BASE_DIR)"
     )
+
     parser.add_argument(
         "--output-path",
         type=str,
         default=None,
         help="Путь для сохранения выходных JSON файлов (если не указан, используется директория с датасетами)"
     )
+
     return parser.parse_args()
 
 

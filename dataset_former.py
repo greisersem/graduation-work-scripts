@@ -22,10 +22,11 @@ def safe_mkdir(path):
     os.makedirs(path, exist_ok=True)
 
 
-def find_dataset_paths(dataset_path, structure):
+def find_dataset_paths(dataset_path, structure, arg=False):
     paths = []
+    dataset_splitting = ["train", "val"] if arg else ["train", "val", "test"]
     if structure == "split":
-        for subset in ["train", "val", "test"]:
+        for subset in dataset_splitting:
             subdir = os.path.join(dataset_path, subset)
             if os.path.exists(os.path.join(subdir, "images")) and os.path.exists(os.path.join(subdir, "labels")):
                 paths.append((os.path.join(subdir, "images"), os.path.join(subdir, "labels")))
@@ -33,7 +34,7 @@ def find_dataset_paths(dataset_path, structure):
         if os.path.exists(os.path.join(dataset_path, "images")) and os.path.exists(os.path.join(dataset_path, "labels")):
             paths.append((os.path.join(dataset_path, "images"), os.path.join(dataset_path, "labels")))
     elif structure == "nested_split":
-        for subset in ["train", "val", "test"]:
+        for subset in dataset_splitting:
             img_dir = os.path.join(dataset_path, "images", subset)
             lbl_dir = os.path.join(dataset_path, "labels", subset)
             if os.path.exists(img_dir) and os.path.exists(lbl_dir):
@@ -79,6 +80,12 @@ def parse_args():
         help="Путь к JSON файлам с информацией о датасетах (если не указан, используется source-path)"
     )
     
+    parser.add_argument(
+        "--exclude-test",
+        action="store_true",
+        help="Исключить тестовые данные из выбранных датасетов"
+    )
+
     return parser.parse_args()
 
 
@@ -172,7 +179,7 @@ def main():
     total_labels = 0
     for dataset_name, info in matching_datasets:
         dataset_path = os.path.join(source_dir, dataset_name)
-        for _, labels_path in find_dataset_paths(dataset_path, info["structure"]):
+        for _, labels_path in find_dataset_paths(dataset_path, info["structure"], args.exclude_test):
             total_labels += len([f for f in os.listdir(labels_path) if f.endswith(".txt")])
 
     image_counter = 0
@@ -180,7 +187,7 @@ def main():
     with tqdm(total=total_labels, desc="Обработка датасетов", unit="файл") as pbar:
         for dataset_name, info in matching_datasets:
             dataset_path = os.path.join(source_dir, dataset_name)
-            for images_path, labels_path in find_dataset_paths(dataset_path, info["structure"]):
+            for images_path, labels_path in find_dataset_paths(dataset_path, info["structure"], args.exclude_test):
 
                 pairs = []
                 for label_file in os.listdir(labels_path):
@@ -215,6 +222,7 @@ def main():
                             shutil.copy2(image_src, image_dst)
                             image_counter += 1
                         pbar.update(1)
+
     print(f"\n[DEBUG] Всего label-файлов: {total_labels}")
     print(f"[DEBUG] Отфильтровано и скопировано: {image_counter}")
     print(f"[DEBUG] Процент используемых файлов: {image_counter / total_labels * 100:.2f}%")
