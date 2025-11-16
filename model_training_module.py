@@ -1,7 +1,7 @@
+import sys
 import os
 import argparse
 from ultralytics import YOLO
-import csv
 
 
 DATASET_PATH = "/media/user/Data/IndustrialSafety/Datasets/HardHatSkz"
@@ -93,13 +93,13 @@ def train_yolo(dataset_path, model_version, epochs, batch, img_size, target_dir)
     
     if os.path.exists(model_dir):
         while True:
-            answer = input(f"[WARNING] Папка с таким названием уже существует: {model_dir}\nПродолжить обучение? (y/n): ").strip().lower()
+            answer = input(f"[WARNING] Папка с таким названием уже существует: {model_dir}. Продолжить обучение? (y/n): \n").strip().lower()
             if answer == 'y':
                 break
             elif answer == 'n':
-                exit(0)
+                sys.exit(1)
             else:
-                print("Пожалуйста, введите только 'y' или 'n'.")
+                print("Пожалуйста, введите только 'y' или 'n'.\n")
     else:
         os.makedirs(model_dir, exist_ok=True)
 

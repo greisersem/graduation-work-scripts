@@ -1,3 +1,4 @@
+import sys
 import os
 import subprocess
 import time
@@ -32,14 +33,8 @@ def update_status(index, status):
 def start_new_process(cmd):
     process = subprocess.Popen(
         cmd,
-        shell=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True
+        shell=True
     )
-
-    for line in process.stdout:
-        print(line)
 
     result = process.wait()
     return result
@@ -101,36 +96,40 @@ def main():
     main_window()
     statuses = load_statuses()
 
-    while True:
-        tasks = read_txt(QUEUE_TXT)
-        
-        for t in tasks:
-            if t not in statuses:
-                statuses[t] = "Ждет выполнения"
-        save_statuses(statuses)
+    try:
+        while True:
+            tasks = read_txt(QUEUE_TXT)
+            
+            for t in tasks:
+                if t not in statuses:
+                    statuses[t] = "Ждет выполнения"
+            save_statuses(statuses)
 
-        next_task = None
-        for t in tasks:
-            if statuses.get(t) == "Ждет выполнения":
-                next_task = t
-                break
+            next_task = None
+            for t in tasks:
+                if statuses.get(t) == "Ждет выполнения":
+                    next_task = t
+                    break
 
-        if next_task is None:
-            time.sleep(5)
-            continue
+            if next_task is None:
+                time.sleep(5)
+                continue
 
-        statuses[next_task] = "Выполняется"
-        save_statuses(statuses)
-        
-        cmd = process_line(next_task)
-        result = start_new_process(cmd)
+            statuses[next_task] = "Выполняется"
+            save_statuses(statuses)
+            
+            cmd = process_line(next_task)
+            result = start_new_process(cmd)
 
-        if result == 0:
-            statuses[next_task] = "Выполнено"
-        else:
-            statuses[next_task] = "Ошибка"
-        
-        save_statuses(statuses)
+            if result == 0:
+                statuses[next_task] = "Выполнено"
+            else:
+                statuses[next_task] = "Ошибка"
+            
+            save_statuses(statuses)
+    finally:
+        if os.path.exists(STATUS_FILE):
+            os.remove(STATUS_FILE)
 
 
 if __name__ == "__main__":
