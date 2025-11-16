@@ -2,7 +2,6 @@ import os
 import subprocess
 import time
 
-
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 QUEUE_TXT = os.path.join(BASE_DIR, "training_queue.txt")
 TMP_DIR = os.path.join(BASE_DIR, "tmp")
@@ -14,14 +13,15 @@ os.makedirs(TMP_DIR, exist_ok=True)
 def main_window():
     subprocess.Popen([
         "gnome-terminal", "--",
-        "bash", "-c", f"watch -n 1 cat {STATUS_FILE}; exec bash"   
+        "bash", "-c",
+        f"watch -n 1 cat {STATUS_FILE}; exec bash"
     ])
 
 
 def update_status(index, status):
     with open(STATUS_FILE, "r", encoding="utf-8") as f:
         lines = f.readlines()
-    
+
     base_line = lines[index].split(" | ")[0]
     lines[index] = f"{base_line} | {status}\n"
 
@@ -39,12 +39,11 @@ def start_new_process(cmd):
     )
 
     for line in process.stdout:
-        print(line, end="")
+        print(line)
 
     result = process.wait()
-
     return result
-    
+
 
 def read_txt(txt_file):
     try:
@@ -66,7 +65,7 @@ def process_line(line):
 
         if len(arguments) < 1:
             return None
-        
+
         if not arguments[0].startswith("python3"):
             arguments.insert(0, "python3")
         
@@ -132,7 +131,6 @@ def main():
             statuses[next_task] = "Ошибка"
         
         save_statuses(statuses)
-    
 
 
 if __name__ == "__main__":
