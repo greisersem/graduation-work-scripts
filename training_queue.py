@@ -1,10 +1,14 @@
 import os
 import subprocess
+import time
 
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 QUEUE_TXT = os.path.join(BASE_DIR, "training_queue.txt")
+TMP_DIR = os.path.join(BASE_DIR, "tmp")
 STATUS_FILE = os.path.join(BASE_DIR, "tmp/status.txt")
+
+os.makedirs(TMP_DIR, exist_ok=True)
 
 
 def main_window():
@@ -28,7 +32,7 @@ def update_status(index, status):
 def start_new_process(cmd):
     process = subprocess.Popen([
         "gnome-terminal", "--",
-        "bash", "-c", f"{cmd}; exec bash"   
+        "bash", "-c", f"{cmd}; exit $?; exec bash"   
     ])
 
     return process
@@ -49,6 +53,12 @@ def process_line(line):
     try:
         arguments = line.strip().split()
         
+        if not arguments or arguments[0].startswith("#"):
+            return None
+
+        if len(arguments) < 1:
+            return None
+        
         if not arguments[0].startswith("python3"):
             arguments.insert(0, "python3")
         
@@ -59,30 +69,64 @@ def process_line(line):
     except Exception as e:
         print(f"[ERROR] Ошибка при обработке команды: {e}")
         return None
+    
+
+def load_statuses():
+    if not os.path.exists(STATUS_FILE):
+        return {}
+    
+    statuses = {}
+    with open(STATUS_FILE, "r", encoding="utf-8") as f:
+        for line in f:
+            if " | " in line:
+                task, st = line.split(" | ")
+                statuses[task] = st
+    return statuses
+
+
+def save_statuses(statuses):
+    with open(STATUS_FILE, "w", encoding="utf-8") as f:
+        for task, status in statuses.items():
+            f.write(f"{task} | {status}\n")     
 
 
 def main():
-    content = read_txt(QUEUE_TXT)
-    
-    with open(STATUS_FILE, "w", encoding="utf-8") as f:
-        for line in content:
-            f.write(line + " | Ждет выполнения\n")
-
     main_window()
-    
-    commands = []
-    for line in content:
-        command = process_line(line)
-        commands.append(command)
+    statuses = load_statuses()
 
-    for i, command in enumerate(commands):
-        try:
-            update_status(i, "Выполняется")
-            process = start_new_process(command)
-            process.wait()
-            update_status(i, "Выполнено")
-        except Exception as e:
-            update_status(i, f"Ошибка: {e}")
+    while True:
+        tasks = read_txt(QUEUE_TXT)
+        
+        for t in tasks:
+            if t not in statuses:
+                statuses[t] = "Ждет выполнения"
+        save_statuses(statuses)
+
+        next_task = None
+        for t in tasks:
+            if statuses.get(t) == "Ждет выполнения":
+                next_task = t
+                break
+
+        if next_task is None:
+            time.sleep(5)
+            continue
+
+        statuses[next_task] = "Выполняется"
+        save_statuses(statuses)
+        
+        cmd = process_line(next_task)
+        process = start_new_process(cmd)
+        result = process.wait()
+
+        if result == 0:
+            statuses[next_task] = "Выполнено"
+        else:
+            statuses[next_task] = "Ошибка"
+        
+        save_statuses(statuses)
+    
+
 
 if __name__ == "__main__":
     main()
