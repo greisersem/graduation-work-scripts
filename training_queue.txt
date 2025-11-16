@@ -1,0 +1,2 @@
+python3 model_training_module.py --data /media/user/Data/IndustrialSafety/Datasets/merged_dataset --model yolov8n --epochs 200
+python3 model_training_module.py --data /media/user/Data/IndustrialSafety/Datasets/merged_dataset --model yolov8n --epochs 200
