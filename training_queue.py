@@ -30,12 +30,20 @@ def update_status(index, status):
 
 
 def start_new_process(cmd):
-    process = subprocess.Popen([
-        "gnome-terminal", "--",
-        "bash", "-c", f"{cmd}; exit $?; exec bash"   
-    ])
+    process = subprocess.Popen(
+        cmd,
+        shell=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True
+    )
 
-    return process
+    for line in process.stdout:
+        print(line, end="")
+
+    result = process.wait()
+
+    return result
     
 
 def read_txt(txt_file):
@@ -116,8 +124,7 @@ def main():
         save_statuses(statuses)
         
         cmd = process_line(next_task)
-        process = start_new_process(cmd)
-        result = process.wait()
+        result = start_new_process(cmd)
 
         if result == 0:
             statuses[next_task] = "Выполнено"

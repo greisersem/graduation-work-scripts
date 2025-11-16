@@ -6,12 +6,12 @@ import argparse
 from tqdm import tqdm
 
 
-BASE_DIR = r"C:\Users\greis\Desktop\Работы уник\Диплом\Датасеты"
+BASE_DIR = "/media/user/Data/IndustrialSafety/Datasets"
 JSON_FILE = "datasets_info.json"
 CLASS_NAMES_FILE = "class_names.json"
 OUTPUT_DATASET_NAME = "merged_dataset"
-OUTPUT_DIR = os.path.join(r"C:\Users\greis\Desktop\Работы уник\Диплом\Датасеты", OUTPUT_DATASET_NAME)
-SELECTED_CLASSES = ["helmet", "gloves", "vest"]
+OUTPUT_DIR = os.path.join("/media/user/Data/IndustrialSafety/Datasets", OUTPUT_DATASET_NAME)
+SELECTED_CLASSES = ["hardhat", "no_hardhat"]
 TRAIN_PART = 0.8  # 80%
 VAL_PART = 0.1    # 10%
 TEST_PART = 0.1   # 10%

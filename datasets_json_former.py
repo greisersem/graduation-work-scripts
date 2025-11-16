@@ -7,7 +7,7 @@ import argparse
 
 sys.stdout.reconfigure(encoding='utf-8')
 
-BASE_DIR = r"C:\Users\greis\Desktop\Работы уник\Диплом\Датасеты"
+BASE_DIR = "/media/user/Data/IndustrialSafety/Datasets"
 OUTPUT_FILE = "datasets_info.json"
 OUTPUT_CLASS_NAMES_FILE = "class_names.json"
 
