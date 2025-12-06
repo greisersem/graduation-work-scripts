@@ -6,6 +6,7 @@ import traceback
 from datetime import datetime
 from pathlib import Path
 from ultralytics import YOLO
+from dataset_hash import calculate_dataset_hash
 
 
 DATASET_PATH = "/media/user/Data/IndustrialSafety/Datasets/HardHatSkz"
@@ -90,13 +91,26 @@ def train_yolo(dataset_path, model_version, epochs, batch, img_size, target_dir)
 
     dataset_name = os.path.basename(os.path.normpath(dataset_path))
 
+    # Вычисляем хеш датасета
+    try:
+        dataset_hash = calculate_dataset_hash(dataset_path)
+        print(f"[INFO] Хеш датасета: {dataset_hash}")
+    except Exception as e:
+        print(f"[WARNING] Не удалось вычислить хеш датасета: {e}")
+        dataset_hash = None
+
     # Форматируем дату и время в формате YYYY-MM-DD_HH-MM
     timestamp_str = training_start_time.strftime("%Y-%m-%d_%H-%M")
+    
+    # Формируем имя папки с хешем
+    folder_name = f"{timestamp_str}_{model_version.replace('.pt', '')}_{epochs}epochs"
+    if dataset_hash:
+        folder_name = f"{folder_name}-{dataset_hash}"
     
     model_dir = os.path.join(
         target_dir, 
         dataset_name, 
-        f"{timestamp_str}_{model_version.replace('.pt', '')}_{epochs}epochs"
+        folder_name
         )
     
     if os.path.exists(model_dir):
@@ -147,7 +161,7 @@ def train_yolo(dataset_path, model_version, epochs, batch, img_size, target_dir)
         training_end_time = datetime.now()
         print(f"[ERROR] Не удалось запустить обучение {model_version} на датасете {dataset_name} на {epochs} эпох: {e}")
     
-    return model_dir, training_start_time, training_end_time
+    return model_dir, training_start_time, training_end_time, dataset_hash
 
 
 def test_yolo(model_dir, dataset_path, training_start_time=None, training_end_time=None):
@@ -212,7 +226,7 @@ def save_metrics_csv(test_result, model_dir):
 def save_training_metadata(model_dir, dataset_path, model_version=None, training_start_time=None, 
                           training_end_time=None, test_start_time=None, test_end_time=None,
                           epochs=None, batch=None, img_size=None, training_success=True, 
-                          training_error=None, test_success=True, test_error=None):
+                          training_error=None, test_success=True, test_error=None, dataset_hash=None):
     """
     Сохраняет метаданные обучения в JSON файл рядом с test_metrics.csv
     
@@ -231,6 +245,7 @@ def save_training_metadata(model_dir, dataset_path, model_version=None, training
         training_error: Сообщение об ошибке обучения (если было)
         test_success: Успешность тестирования (True/False)
         test_error: Сообщение об ошибке тестирования (если было)
+        dataset_hash: Хеш датасета (8 символов)
     """
     metadata = {
         "training_info": {
@@ -240,7 +255,8 @@ def save_training_metadata(model_dir, dataset_path, model_version=None, training
             "dataset": {
                 "name": os.path.basename(os.path.normpath(dataset_path)),
                 "path_absolute": os.path.abspath(dataset_path),
-                "path_relative": _get_relative_path(dataset_path, model_dir)
+                "path_relative": _get_relative_path(dataset_path, model_dir),
+                "hash": dataset_hash
             },
             "hyperparameters": {
                 "epochs": epochs,
@@ -334,10 +350,13 @@ def main():
     test_end_time = None
     model_dir = None
 
+    # Переменная для хранения хеша датасета
+    dataset_hash = None
+    
     if not args.test_only:
         # Обучение с обработкой ошибок
         try:
-            model_dir, training_start_time, training_end_time = train_yolo(
+            model_dir, training_start_time, training_end_time, dataset_hash = train_yolo(
                 dataset_path=data,
                 model_version=model_version,
                 epochs=epochs,
@@ -351,14 +370,22 @@ def main():
             training_end_time = datetime.now()
             print(f"[ERROR] Ошибка при обучении: {e}")
             training_error = f"{str(e)}\n{traceback.format_exc()}"
+            # Вычисляем хеш для случая ошибки
+            try:
+                dataset_hash = calculate_dataset_hash(data)
+            except Exception:
+                dataset_hash = None
             # Создаем директорию для сохранения метаданных об ошибке
             if not model_dir:
                 dataset_name = os.path.basename(os.path.normpath(data))
                 timestamp_str = training_start_time.strftime("%Y-%m-%d_%H-%M") if training_start_time else datetime.now().strftime("%Y-%m-%d_%H-%M")
+                folder_name = f"{timestamp_str}_{model_version.replace('.pt', '')}_{epochs}epochs"
+                if dataset_hash:
+                    folder_name = f"{folder_name}-{dataset_hash}"
                 model_dir = os.path.join(
                     target_dir,
                     dataset_name,
-                    f"{timestamp_str}_{model_version.replace('.pt', '')}_{epochs}epochs"
+                    folder_name
                 )
                 os.makedirs(model_dir, exist_ok=True)
 
@@ -394,7 +421,8 @@ def main():
                 training_success=training_success,
                 training_error=training_error,
                 test_success=test_success,
-                test_error=test_error
+                test_error=test_error,
+                dataset_hash=dataset_hash
             )
     else:
         model_dir = args.model_dir
