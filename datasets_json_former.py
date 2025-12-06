@@ -7,7 +7,7 @@ import argparse
 
 sys.stdout.reconfigure(encoding='utf-8')
 
-BASE_DIR = r"C:\Users\greis\Desktop\Работы уник\Диплом\Датасеты"
+BASE_DIR = "/media/user/Data/IndustrialSafety/Datasets"
 OUTPUT_FILE = "datasets_info.json"
 OUTPUT_CLASS_NAMES_FILE = "class_names.json"
 
@@ -231,18 +231,21 @@ def parse_args():
     parser = argparse.ArgumentParser(
         description="Обработка датасетов и создание JSON файлов с информацией о классах и структуре"
     )
+
     parser.add_argument(
         "--datasets-path",
         type=str,
         default=None,
         help="Путь к папке с датасетами (если не указан, используется значение BASE_DIR)"
     )
+
     parser.add_argument(
         "--output-path",
         type=str,
         default=None,
         help="Путь для сохранения выходных JSON файлов (если не указан, используется директория с датасетами)"
     )
+
     return parser.parse_args()
 
 

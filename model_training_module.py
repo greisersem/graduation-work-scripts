@@ -1,7 +1,7 @@
+import sys
 import os
 import argparse
 from ultralytics import YOLO
-import csv
 
 
 DATASET_PATH = "/media/user/Data/IndustrialSafety/Datasets/HardHatSkz"
@@ -57,6 +57,19 @@ def parse_args():
         help="Путь к папке с результатами обучения"
     )
 
+    parser.add_argument(
+        "--model-dir",
+        type=str,
+        default=None,
+        help="Путь к папке с моделью"
+    )
+
+    parser.add_argument(
+        "--test-only",
+        action="store_true",
+        help="Выполнить только тестирование без обучения"
+    )
+
     return parser.parse_args()
 
 
@@ -80,13 +93,13 @@ def train_yolo(dataset_path, model_version, epochs, batch, img_size, target_dir)
     
     if os.path.exists(model_dir):
         while True:
-            answer = input(f"[WARNING] Папка с таким названием уже существует: {model_dir}\nПродолжить обучение? (y/n): ").strip().lower()
+            answer = input(f"[WARNING] Папка с таким названием уже существует: {model_dir}. Продолжить обучение? (y/n): \n").strip().lower()
             if answer == 'y':
                 break
             elif answer == 'n':
-                exit(0)
+                sys.exit(1)
             else:
-                print("Пожалуйста, введите только 'y' или 'n'.")
+                print("Пожалуйста, введите только 'y' или 'n'.\n")
     else:
         os.makedirs(model_dir, exist_ok=True)
 
@@ -103,45 +116,79 @@ def train_yolo(dataset_path, model_version, epochs, batch, img_size, target_dir)
     else:
         model = YOLO(model_version)
 
-    model.train(
-        data=data_yaml,
-        epochs=epochs,
-        batch=batch,
-        imgsz=img_size,
-        project=model_dir,
-        name="train",
-        exist_ok=False
-    )
-
-    trained_model_path = os.path.join(model_dir, "train", "weights", "best.pt")
-    trained_model = YOLO(trained_model_path)
-
-    result = trained_model.val(
-        data=data_yaml, 
-        split='test', 
-        project=model_dir, 
-        name="test",
-        exist_ok = False
+    try:
+        model.train(
+            data=data_yaml,
+            epochs=epochs,
+            batch=batch,
+            imgsz=img_size,
+            project=model_dir,
+            name="train",
+            exist_ok=False
         )
 
-    save_metrics_csv(result, model_dir)
+        model_path = os.path.join(model_dir, "train", "weights", "best.pt")
 
-    print("\n" + "-" * 60)
-    if os.path.exists(trained_model_path):
-        print(f"[OK] Обучение завершено.")
-        print(f"[INFO] Модель сохранена по пути:\n{trained_model_path}")
-    else:
-        print("[WARNING] best.pt не найден. Проверьте лог Ultralytics.")
-    print("-" * 60 + "\n")
+        print("\n" + "-" * 60)
+        if os.path.exists(model_path):
+            print(f"[OK] Обучение завершено.")
+            print(f"[INFO] Модель сохранена по пути:\n{model_path}")
+    except Exception as e:
+        print(f"[ERROR] Не удалось запустить обучение {model_version} на датасете {dataset_name} на {epochs} эпох: {e}")
+    
+    return model_dir
+
+
+def test_yolo(model_dir, dataset_path):
+    model_path = os.path.join(model_dir, "train", "weights", "best.pt")
+    trained_model = YOLO(model_path)
+
+    data_yaml = os.path.join(dataset_path, "data.yaml")
+
+    print("\n" + "=" * 60)
+    print(f"[INFO] Тестирование модели: {model_dir}")
+    print(f"[INFO] Датасет: {dataset_path}")
+    print(f"[INFO] Конфигурация: {data_yaml}")
+    print(f"[INFO] Сохранение результатов в {model_dir}")
+    print("=" * 60 + "\n")
+    
+    try:
+        result = trained_model.val(
+            data=data_yaml, 
+            split='test', 
+            project=model_dir, 
+            name="test",
+            exist_ok = False
+            )
+
+        csv_file = save_metrics_csv(result, model_dir)
+
+        print("\n" + "-" * 60)
+        if os.path.exists(csv_file):
+            print(f"[OK] Тестирование завершено.")
+            print(f"[INFO] Результаты сохранены по пути:\n{csv_file}")
+        else:
+            print("[ERROR] .csv файл не найден. Проверьте лог Ultralytics.")
+        print("-" * 60 + "\n")
+    except Exception as e:
+        print(f"[ERROR] Не удалось протестировать {model_dir} на датасете {dataset_path}: {e}")
 
 
 def save_metrics_csv(test_result, model_dir):
-    csv_file = os.path.join(model_dir, "test_metrics.csv") 
+    base_name = "test_metrics"
+    ext = ".csv"
+    csv_file = os.path.join(model_dir, base_name + ext)
     
-    csv_data = test_result.to_csv()
+    counter = 1
+    while os.path.exists(csv_file):
+        csv_file = os.path.join(model_dir, f"{base_name}_{counter}{ext}")
+        counter += 1
 
+    csv_data = test_result.to_csv()
     with open(csv_file, "w", encoding="utf-8") as f:
         f.write(csv_data)
+    
+    return csv_file
     
 
 def main():
@@ -154,15 +201,24 @@ def main():
     img_size = args.img_size if args.img_size else IMG_SIZE
     target_dir = args.target_path if args.target_path else MODELS_BASE_DIR
 
-    train_yolo(
-        dataset_path=data,
-        model_version=model_version,
-        epochs=epochs,
-        batch=batch,
-        img_size=img_size,
-        target_dir=target_dir
-    )
+    if not args.test_only:
+        model_dir = train_yolo(
+            dataset_path=data,
+            model_version=model_version,
+            epochs=epochs,
+            batch=batch,
+            img_size=img_size,
+            target_dir=target_dir
+        )
 
+        test_yolo(model_dir, data)
+    else:
+        model_dir = args.model_dir
+        if model_dir:
+            test_yolo(model_dir, data)
+        else:
+            print(f"[ERROR] Не указан путь к модели")
 
+    
 if __name__ == "__main__":
     main()
