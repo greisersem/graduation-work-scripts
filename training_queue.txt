@@ -1,0 +1,3 @@
+dataset_former.py --target-path /media/user/Data/IndustrialSafety/Datasets/test --classes "glasses, vest"
+model_training_module --data /media/user/Data/IndustrialSafety/Datasets/merged_dataset --model yolov8l --epochs 2
+python3 model_training_module.py --data /media/user/Data/IndustrialSafety/Datasets/merged_dataset --model yolov8n --epochs 1
